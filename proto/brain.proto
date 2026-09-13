@@ -2,6 +2,10 @@
 //
 // A tenant is an isolated brain: its own entities, sources, mentions and relations.
 // Imports and questions stream their stages, so a client can show each step as it happens.
+//
+// Every call signs in with two metadata entries, `user` and `key`; without them, or with a
+// wrong pair, the call fails with UNAUTHENTICATED. Admins use every tenant and manage users
+// and tenants; members use the tenants an admin granted, and get PERMISSION_DENIED elsewhere.
 
 syntax = "proto3";
 
@@ -27,6 +31,16 @@ service Brain {
   // The whole tenant as Turtle, and back.
   rpc ExportTurtle(TenantName) returns (TurtleFile);
   rpc ImportTurtle(TurtleFile) returns (TurtleImported);
+
+  // The signed-in user.
+  rpc Me(Empty) returns (User);
+  // Admins: add a member; the reply carries their key, the only time it is shown.
+  rpc AddUser(UserName) returns (NewUser);
+  // Admins: let a member use a tenant, or stop them.
+  rpc Grant(Access) returns (User);
+  rpc Revoke(Access) returns (User);
+  // Who can use a tenant: every admin, then the members granted to it.
+  rpc TenantUsers(TenantName) returns (UserList);
 }
 
 message Empty {}
@@ -294,4 +308,30 @@ message TurtleImported {
   TenantSummary summary = 1;
   // Set when the file came from another tenant.
   string warning = 2;
+}
+
+message UserName {
+  string name = 1;
+}
+
+message User {
+  string name = 1;
+  // "admin" or "member".
+  string role = 2;
+  // The tenants a member was granted; empty for admins, who use every tenant.
+  repeated string tenants = 3;
+}
+
+message NewUser {
+  User user = 1;
+  string key = 2;
+}
+
+message Access {
+  string user = 1;
+  string tenant = 2;
+}
+
+message UserList {
+  repeated User users = 1;
 }
