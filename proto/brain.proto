@@ -1,0 +1,297 @@
+// The brain engine's API. Length-prefixed Protobuf messages over TLS (gRPC).
+//
+// A tenant is an isolated brain: its own entities, sources, mentions and relations.
+// Imports and questions stream their stages, so a client can show each step as it happens.
+
+syntax = "proto3";
+
+package brain.v1;
+
+service Brain {
+  // The engine is up, and which model it uses.
+  rpc Health(Empty) returns (HealthReply);
+
+  rpc ListTenants(Empty) returns (TenantList);
+  rpc CreateTenant(TenantName) returns (TenantSummary);
+  rpc GetTenant(TenantName) returns (TenantSummary);
+  rpc DeleteTenant(TenantName) returns (TenantSummary);
+
+  // Save a sentence as a source, link its names, find its relations, re-link older sources.
+  rpc Import(ImportRequest) returns (stream ImportEvent);
+  // Answer from what the tenant knows, with options and probabilities. Stores nothing.
+  rpc Ask(AskRequest) returns (stream AskEvent);
+
+  // An empty id shows the tenant; `e1` an entity; `s1` a source.
+  rpc Show(ShowRequest) returns (ShowReply);
+
+  // The whole tenant as Turtle, and back.
+  rpc ExportTurtle(TenantName) returns (TurtleFile);
+  rpc ImportTurtle(TurtleFile) returns (TurtleImported);
+}
+
+message Empty {}
+
+message HealthReply {
+  // "gpt-5-nano (reasoning low)", or empty when the LLM is not configured.
+  string llm = 1;
+  // Why the LLM is not configured; empty when it is.
+  string llm_error = 2;
+}
+
+message TenantName {
+  string name = 1;
+}
+
+// Tokens, calls and time spent.
+message Cost {
+  uint64 calls = 1;
+  uint64 input_tokens = 2;
+  uint64 output_tokens = 3;
+  uint64 reasoning_tokens = 4;
+  // Calls whose response had no usage block.
+  uint64 unreported_calls = 5;
+  double seconds = 6;
+  // Only when the engine knows the model's prices.
+  optional double dollars = 7;
+}
+
+message TenantSummary {
+  string name = 1;
+  uint32 entities = 2;
+  uint32 sources = 3;
+  uint32 relations = 4;
+  // Sources waiting for a relation pass after re-linking.
+  uint32 pending_reask = 5;
+  Cost cost = 6;
+}
+
+message TenantList {
+  repeated TenantSummary tenants = 1;
+}
+
+// One entity a name might mean, and how sure the brain is, from 0 to 1.
+message Guess {
+  string entity_id = 1;
+  string entity_name = 2;
+  float confidence = 3;
+}
+
+message CodeMatch {
+  string text = 1;
+  repeated Guess guesses = 2;
+}
+
+// What the check did with one LLM proposal. `detail` is the note or the reason.
+message Decision {
+  string subject = 1;
+  bool accepted = 2;
+  string detail = 3;
+}
+
+message Entity {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string aliases = 4;
+}
+
+message Alias {
+  string entity_id = 1;
+  string entity_name = 2;
+  string alias = 3;
+}
+
+message Relation {
+  string id = 1;
+  string subject_id = 2;
+  string subject_name = 3;
+  string predicate = 4;
+  string object_id = 5;
+  string object_name = 6;
+  float confidence = 7;
+  string source_id = 8;
+  // The first relation of this type in the tenant.
+  bool new_type = 9;
+}
+
+// A sentence in parts: plain text, or a linked name with its guesses (empty: unplaced).
+message Segment {
+  string text = 1;
+  bool link = 2;
+  repeated Guess guesses = 3;
+}
+
+message Mention {
+  string source_id = 1;
+  string text = 2;
+  uint32 start = 3;
+  uint32 end = 4;
+  repeated Guess guesses = 5;
+  // "code" or "llm".
+  string by = 6;
+  string source_text = 7;
+}
+
+message ImportRequest {
+  string tenant = 1;
+  string text = 2;
+}
+
+message ImportEvent {
+  oneof event {
+    SourceSaved source = 1;
+    CodePass code = 2;
+    Linked linked = 3;
+    Relinked relinked = 4;
+    Reasked reasked = 5;
+    Finished finished = 6;
+  }
+}
+
+message SourceSaved {
+  string id = 1;
+  string text = 2;
+}
+
+// Names already known, before the LLM is asked.
+message CodePass {
+  repeated CodeMatch matches = 1;
+}
+
+message Linked {
+  // Empty when the call worked; otherwise the code links were kept.
+  string llm_error = 1;
+  repeated Decision mentions = 2;
+  repeated Decision relations = 3;
+  repeated Entity new_entities = 4;
+  repeated Alias new_aliases = 5;
+  repeated Relation new_relations = 6;
+  repeated Segment segments = 7;
+}
+
+message Relinked {
+  repeated Mention mentions = 1;
+}
+
+// One earlier source asked for relations again.
+message Reasked {
+  string source_id = 1;
+  string llm_error = 2;
+  repeated Decision relations = 3;
+  repeated Relation new_relations = 4;
+}
+
+message Finished {
+  Cost cost = 1;
+  // Sources still waiting for a relation pass.
+  uint32 waiting = 2;
+}
+
+message AskRequest {
+  string tenant = 1;
+  string question = 2;
+}
+
+message AskEvent {
+  oneof event {
+    AskIndex index = 1;
+    AskAnswer answer = 2;
+    Finished finished = 3;
+  }
+}
+
+// What the question names, and how much evidence was gathered, before the LLM is asked.
+message AskIndex {
+  repeated CodeMatch matches = 1;
+  uint32 entities = 2;
+  uint32 relations = 3;
+  uint32 sources = 4;
+}
+
+message Evidence {
+  string id = 1;
+  // "Maya livesIn Toronto" for a relation, the text for a source.
+  string label = 2;
+  // A relation's stored confidence.
+  optional float stored = 3;
+}
+
+message AnswerOption {
+  string answer = 1;
+  string entity_id = 2;
+  string entity_name = 3;
+  float probability = 4;
+  repeated Evidence based_on = 5;
+}
+
+message AskAnswer {
+  string error = 1;
+  repeated AnswerOption options = 2;
+  float something_else = 3;
+  // What the check dropped or flagged.
+  repeated string notes = 4;
+}
+
+message ShowRequest {
+  string tenant = 1;
+  string id = 2;
+}
+
+message ShowReply {
+  oneof view {
+    Overview overview = 1;
+    EntityView entity = 2;
+    SourceView source = 3;
+  }
+}
+
+message EntityLine {
+  string id = 1;
+  string name = 2;
+  repeated string other_names = 3;
+  uint32 mentions = 4;
+  uint32 relations = 5;
+}
+
+message CallLine {
+  string what = 1;
+  double seconds = 2;
+  uint64 input_tokens = 3;
+  uint64 output_tokens = 4;
+}
+
+message Overview {
+  TenantSummary summary = 1;
+  uint32 unplaced = 2;
+  uint32 unsettled = 3;
+  repeated EntityLine entities = 4;
+  repeated string types = 5;
+  repeated CallLine recent_calls = 6;
+}
+
+message EntityView {
+  Entity entity = 1;
+  repeated Relation relations = 2;
+  repeated Mention mentions = 3;
+}
+
+message SourceView {
+  string id = 1;
+  string text = 2;
+  repeated Mention mentions = 3;
+  repeated Relation relations = 4;
+  repeated Segment segments = 5;
+}
+
+message TurtleFile {
+  string tenant = 1;
+  string content = 2;
+  // Set on export.
+  TenantSummary summary = 3;
+}
+
+message TurtleImported {
+  TenantSummary summary = 1;
+  // Set when the file came from another tenant.
+  string warning = 2;
+}
