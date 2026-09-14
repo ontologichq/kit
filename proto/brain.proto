@@ -181,6 +181,15 @@ message Linked {
   repeated Alias new_aliases = 5;
   repeated Relation new_relations = 6;
   repeated Segment segments = 7;
+  Phrases phrases = 8;
+}
+
+// The noun phrase checklist of one pass: what grammar found in the text, what the LLM's first
+// answer left out and was asked about again, and what is still left out after that.
+message Phrases {
+  repeated string found = 1;
+  repeated string follow_up = 2;
+  repeated string undecided = 3;
 }
 
 message Relinked {
