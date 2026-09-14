@@ -115,6 +115,7 @@ message Alias {
   string alias = 3;
 }
 
+// A fact: one per distinct subject, relation and object, however many sources state it.
 message Relation {
   string id = 1;
   string subject_id = 2;
@@ -122,10 +123,27 @@ message Relation {
   string predicate = 4;
   string object_id = 5;
   string object_name = 6;
+  // As sure as its strongest evidence.
   float confidence = 7;
-  string source_id = 8;
+  reserved 8;
   // The first relation of this type in the tenant.
   bool new_type = 9;
+  repeated Evidence evidence = 10;
+}
+
+// One place a source states a fact: the source, which bytes of it, those words, how sure.
+message Evidence {
+  string source_id = 1;
+  uint32 start = 2;
+  uint32 end = 3;
+  string text = 4;
+  float confidence = 5;
+}
+
+// A fact the tenant already had, stated again by a new source.
+message MoreEvidence {
+  Relation relation = 1;
+  Evidence evidence = 2;
 }
 
 // A sentence in parts: plain text, or a linked name with its guesses (empty: unplaced).
@@ -182,6 +200,7 @@ message Linked {
   repeated Relation new_relations = 6;
   repeated Segment segments = 7;
   Phrases phrases = 8;
+  repeated MoreEvidence more_evidence = 9;
 }
 
 // The noun phrase checklist of one pass: what grammar found in the text, what the LLM's first
@@ -202,6 +221,7 @@ message Reasked {
   string llm_error = 2;
   repeated Decision relations = 3;
   repeated Relation new_relations = 4;
+  repeated MoreEvidence more_evidence = 5;
 }
 
 message Finished {
@@ -231,7 +251,8 @@ message AskIndex {
   uint32 sources = 4;
 }
 
-message Evidence {
+// An id an answer rests on: a relation, a source or an entity.
+message Citation {
   string id = 1;
   // "Maya livesIn Toronto" for a relation, the text for a source.
   string label = 2;
@@ -244,7 +265,7 @@ message AnswerOption {
   string entity_id = 2;
   string entity_name = 3;
   float probability = 4;
-  repeated Evidence based_on = 5;
+  repeated Citation based_on = 5;
 }
 
 message AskAnswer {
