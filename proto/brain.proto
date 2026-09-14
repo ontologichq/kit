@@ -22,6 +22,8 @@ service Brain {
 
   // Save a sentence as a source, link its names, find its relations, re-link older sources.
   rpc Import(ImportRequest) returns (stream ImportEvent);
+  // The same for a file: an email (.eml) or text, linked part by part.
+  rpc ImportBlob(BlobRequest) returns (stream ImportEvent);
   // Answer from what the tenant knows, with options and probabilities. Stores nothing.
   rpc Ask(AskRequest) returns (stream AskEvent);
 
@@ -169,6 +171,13 @@ message ImportRequest {
   string text = 2;
 }
 
+message BlobRequest {
+  string tenant = 1;
+  // The file name; `.eml` is read as an email, anything else as UTF-8 text.
+  string name = 2;
+  bytes content = 3;
+}
+
 message ImportEvent {
   oneof event {
     SourceSaved source = 1;
@@ -183,11 +192,21 @@ message ImportEvent {
 message SourceSaved {
   string id = 1;
   string text = 2;
+  // "fact", "text" or "email".
+  string kind = 3;
+  // The file name of a blob.
+  string name = 4;
+  // How many parts it is linked in: 1 for a fact.
+  uint32 parts = 5;
 }
 
 // Names already known, before the LLM is asked.
 message CodePass {
   repeated CodeMatch matches = 1;
+  // Which part of a blob, from 1; 0 for a fact.
+  uint32 part = 2;
+  // A blob part's text.
+  string text = 3;
 }
 
 message Linked {
@@ -201,6 +220,8 @@ message Linked {
   repeated Segment segments = 7;
   Phrases phrases = 8;
   repeated MoreEvidence more_evidence = 9;
+  // Which part of a blob, from 1; 0 for a fact.
+  uint32 part = 10;
 }
 
 // The noun phrase checklist of one pass: what grammar found in the text, what the LLM's first
