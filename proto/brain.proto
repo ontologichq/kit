@@ -277,6 +277,9 @@ message People {
   // Their addresses, as facts (`hasEmail`).
   repeated Relation new_relations = 5;
   repeated RelationType new_types = 6;
+  // Each message of the thread as a thing, when new to the tenant (`wrote`, `sentTo`,
+  // `copiedTo`, `sentOn` and `about` facts hang on it).
+  repeated Entity new_messages = 7;
 }
 
 message SourceSaved {
