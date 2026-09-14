@@ -254,6 +254,8 @@ message Finished {
 message AskRequest {
   string tenant = 1;
   string question = 2;
+  // Leave the source text out and answer from facts alone: measures what the graph holds.
+  bool graph_only = 3;
 }
 
 message AskEvent {
