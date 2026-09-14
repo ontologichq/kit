@@ -329,6 +329,9 @@ message AskAnswer {
   float something_else = 3;
   // What the check dropped or flagged.
   repeated string notes = 4;
+  // True when the question has one answer and the options exclude each other; false for a set
+  // whose answers can all be right, each with its own probability.
+  bool exclusive = 5;
 }
 
 message ShowRequest {
