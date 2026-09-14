@@ -54,6 +54,9 @@ message HealthReply {
   string llm_error = 2;
   // The tagger that marks candidates before the LLM: "gliner_large-v2.1", or "none (why)".
   string tagger = 3;
+  // The build: "3dc5cda, built 2026-09-14 05:12 UTC" (the commit, "-dirty" for uncommitted
+  // changes).
+  string version = 4;
 }
 
 message TenantName {
