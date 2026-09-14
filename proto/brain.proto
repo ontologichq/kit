@@ -52,6 +52,8 @@ message HealthReply {
   string llm = 1;
   // Why the LLM is not configured; empty when it is.
   string llm_error = 2;
+  // The tagger that marks candidates before the LLM: "gliner_large-v2.1", or "none (why)".
+  string tagger = 3;
 }
 
 message TenantName {
@@ -109,6 +111,8 @@ message Entity {
   string name = 2;
   string description = 3;
   repeated string aliases = 4;
+  // "person", "organization", "place", "thing" or "event".
+  string kind = 5;
 }
 
 message Alias {
@@ -117,7 +121,10 @@ message Alias {
   string alias = 3;
 }
 
-// A fact: one per distinct subject, relation and object, however many sources state it.
+// A fact: one per distinct subject, relation and object, however many sources state it. The
+// object is an entity, or a value: then `object_id` is empty, `object_name` is the value as the
+// source wrote it, and `object_kind` is "date", "time", "money", "percent", "quantity",
+// "contact" or "text".
 message Relation {
   string id = 1;
   string subject_id = 2;
@@ -131,6 +138,7 @@ message Relation {
   // The first relation of this type in the tenant.
   bool new_type = 9;
   repeated Evidence evidence = 10;
+  string object_kind = 11;
 }
 
 // One place a source states a fact: the source, which bytes of it, those words, how sure.
@@ -197,6 +205,8 @@ message People {
   // People the tenant already had.
   repeated Entity known = 3;
   uint32 messages = 4;
+  // Their addresses, as facts (`hasEmail`).
+  repeated Relation new_relations = 5;
 }
 
 message SourceSaved {
@@ -228,18 +238,27 @@ message Linked {
   repeated Alias new_aliases = 5;
   repeated Relation new_relations = 6;
   repeated Segment segments = 7;
-  Phrases phrases = 8;
+  Checklist checklist = 8;
   repeated MoreEvidence more_evidence = 9;
   // Which part of a blob, from 1; 0 for a fact.
   uint32 part = 10;
 }
 
-// The noun phrase checklist of one pass: what grammar found in the text, what the LLM's first
-// answer left out and was asked about again, and what is still left out after that.
-message Phrases {
-  repeated string found = 1;
+// The checklist of one pass: the candidates the tagger found in the text, the ones the LLM's
+// first answer left out and was asked about again, and the ones still left out after that.
+message Checklist {
+  repeated Candidate found = 1;
   repeated string follow_up = 2;
   repeated string undecided = 3;
+  // Why the tagger found nothing, when it failed.
+  string error = 4;
+}
+
+// Words the tagger marked as a thing or a value, with the kind it guessed and how sure it is.
+message Candidate {
+  string text = 1;
+  string kind = 2;
+  float probability = 3;
 }
 
 message Relinked {
