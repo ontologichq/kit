@@ -434,6 +434,7 @@ message Overview {
   repeated EntityLine entities = 4;
   repeated string types = 5;
   repeated CallLine recent_calls = 6;
+  repeated string source_ids = 7;
 }
 
 message EntityView {
