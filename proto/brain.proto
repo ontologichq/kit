@@ -19,6 +19,9 @@ service Brain {
   rpc CreateTenant(TenantName) returns (TenantSummary);
   rpc GetTenant(TenantName) returns (TenantSummary);
   rpc DeleteTenant(TenantName) returns (TenantSummary);
+  // The committed tenant counted by kind, its files, when it was written and what it has cost
+  // over its life. `Show` counts the staged imports too; here `staged` says what waits.
+  rpc TenantMeta(TenantName) returns (Meta);
 
   // Save a sentence as a source, link its names, find its relations, re-link older sources.
   rpc Import(ImportRequest) returns (stream ImportEvent);
@@ -101,6 +104,49 @@ message Staged {
   uint32 sources = 1;
   uint32 entities = 2;
   uint32 relations = 3;
+}
+
+message KindCount {
+  string kind = 1;
+  uint32 count = 2;
+}
+
+message Meta {
+  string tenant = 1;
+  // RFC 3339 in UTC; empty for a tenant not written since meta was kept.
+  string created = 2;
+  string updated = 3;
+  // Bytes of the tenant file, of the staged file (0 when nothing is staged), and of the text of
+  // every committed source.
+  uint64 file_bytes = 4;
+  uint64 staged_bytes = 5;
+  uint64 source_bytes = 6;
+  // Every kind, in a fixed order, zeros included.
+  repeated KindCount entities = 7;
+  repeated KindCount sources = 8;
+  // `value_facts` of the facts end in a value instead of an entity.
+  uint32 facts = 9;
+  uint32 value_facts = 10;
+  uint32 relation_types = 11;
+  uint32 mentions = 12;
+  uint32 unplaced = 13;
+  uint32 unsettled = 14;
+  uint32 pending_reask = 15;
+  // Unset when nothing is staged.
+  Staged staged = 16;
+  // Every import and question the tenant has had, failed ones included, and what their calls
+  // cost across restarts, in dollars at the prices of the moment each was charged. Seconds are
+  // measured in the engine, from the request to the last call.
+  uint64 imports = 17;
+  Cost import_cost = 18;
+  uint64 questions = 19;
+  Cost question_cost = 20;
+  // Every call since the engine started.
+  Cost run = 21;
+  // The build, the model and the tagger that last wrote the tenant.
+  string version = 22;
+  string llm = 23;
+  string tagger = 24;
 }
 
 message TenantList {
