@@ -74,6 +74,8 @@ message Cost {
   double seconds = 6;
   // Only when the engine knows the model's prices.
   optional double dollars = 7;
+  // Part of input_tokens: read from the provider's prompt cache.
+  uint64 cached_tokens = 8;
 }
 
 message TenantSummary {
