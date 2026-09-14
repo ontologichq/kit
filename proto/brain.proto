@@ -65,6 +65,8 @@ message HealthReply {
   // The build: "3dc5cda, built 2026-09-14 05:12 UTC" (the commit, "-dirty" for uncommitted
   // changes).
   string version = 4;
+  // The embedding model: "bge-small-en-v1.5", or "none (why)".
+  string embedder = 5;
 }
 
 message TenantName {
@@ -147,6 +149,7 @@ message Meta {
   string version = 22;
   string llm = 23;
   string tagger = 24;
+  string embedder = 25;
 }
 
 message TenantList {
