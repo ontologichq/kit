@@ -27,6 +27,11 @@ service Brain {
   // Answer from what the tenant knows, with options and probabilities. Stores nothing.
   rpc Ask(AskRequest) returns (stream AskEvent);
 
+  // Imports wait in a staged copy of the tenant until they are committed: questions do not see
+  // them until then. The reply's `staged` is what was committed, or what was dropped.
+  rpc Commit(TenantName) returns (TenantSummary);
+  rpc Rollback(TenantName) returns (TenantSummary);
+
   // An empty id shows the tenant; `e1` an entity; `s1` a source.
   rpc Show(ShowRequest) returns (ShowReply);
 
@@ -86,6 +91,16 @@ message TenantSummary {
   // Sources waiting for a relation pass after re-linking.
   uint32 pending_reask = 5;
   Cost cost = 6;
+  // What waits for a commit beyond the counts above; unset when nothing is staged.
+  Staged staged = 7;
+}
+
+// The staged copy of a tenant beyond the committed one. One import adds one source, so
+// `sources` is how many imports wait.
+message Staged {
+  uint32 sources = 1;
+  uint32 entities = 2;
+  uint32 relations = 3;
 }
 
 message TenantList {
@@ -290,6 +305,8 @@ message AskRequest {
   string question = 2;
   // Leave the source text out and answer from facts alone: measures what the graph holds.
   bool graph_only = 3;
+  // Answer from the staged copy, imports not committed yet included.
+  bool staged = 4;
 }
 
 message AskEvent {
