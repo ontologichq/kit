@@ -186,7 +186,17 @@ message ImportEvent {
     Relinked relinked = 4;
     Reasked reasked = 5;
     Finished finished = 6;
+    People people = 7;
   }
+}
+
+// The people in an email thread's headers, linked in code before any model call.
+message People {
+  repeated Entity new_entities = 1;
+  repeated Alias new_aliases = 2;
+  // People the tenant already had.
+  repeated Entity known = 3;
+  uint32 messages = 4;
 }
 
 message SourceSaved {
