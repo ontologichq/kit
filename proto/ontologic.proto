@@ -1,4 +1,4 @@
-// The brain engine's API. Length-prefixed Protobuf messages over TLS (gRPC).
+// The ontologic engine's API. Length-prefixed Protobuf messages over TLS (gRPC).
 //
 // A tenant is an isolated brain: its own entities, sources, mentions and relations.
 // Imports and questions stream their stages, so a client can show each step as it happens.
@@ -9,9 +9,9 @@
 
 syntax = "proto3";
 
-package brain.v1;
+package ontologic.v1;
 
-service Brain {
+service Ontologic {
   // The engine is up, and which model it uses.
   rpc Health(Empty) returns (HealthReply);
 
