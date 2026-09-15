@@ -150,6 +150,9 @@ message Meta {
   string llm = 23;
   string tagger = 24;
   string embedder = 25;
+  // Where the time of every import and question went, added up over the tenant's life.
+  Timing import_timing = 26;
+  Timing question_timing = 27;
 }
 
 message TenantList {
@@ -317,6 +320,22 @@ message Linked {
   uint32 part = 10;
   // Relation types this part is the first to use, with what they mean.
   repeated RelationType new_types = 11;
+  // The tagger, the model and the code on this part.
+  Timing timing = 12;
+}
+
+// Where time went, in milliseconds. A part: tagger, model, code (the checks and applying). An
+// import: those added over its parts (which run at the same time, so they can exceed total),
+// then relink, reask and save. A question: context and model. Zero is left out when shown.
+message Timing {
+  uint64 tagger_ms = 1;
+  uint64 model_ms = 2;
+  uint64 code_ms = 3;
+  uint64 relink_ms = 4;
+  uint64 reask_ms = 5;
+  uint64 save_ms = 6;
+  uint64 context_ms = 7;
+  uint64 total_ms = 8;
 }
 
 // The checklist of one pass: the candidates the tagger found in the text, the ones the LLM's
@@ -354,6 +373,7 @@ message Finished {
   Cost cost = 1;
   // Sources still waiting for a relation pass.
   uint32 waiting = 2;
+  Timing timing = 3;
 }
 
 message AskRequest {
