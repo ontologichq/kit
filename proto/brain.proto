@@ -211,6 +211,8 @@ message Relation {
   bool new_type = 9;
   repeated Evidence evidence = 10;
   string object_kind = 11;
+  // The words of the source the fact holds under ("fully diluted"); empty when it always holds.
+  string condition = 12;
 }
 
 // One place a source states a fact: the source, which bytes of it, those words, how sure.
