@@ -1,0 +1,31 @@
+[package]
+name = "ontologic-kit"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "The ontologic engine's API: its gRPC messages, a signed-in client, and a fake engine for testing clients."
+repository = "https://github.com/ontologichq/kit"
+publish = false
+
+[features]
+default = []
+# A client that signs in, trusts the engine's certificate and explains connection failures.
+client = ["tonic/tls-ring", "tonic/tls-webpki-roots"]
+# A fake engine served over TLS in process, with scripted replies, for tests of clients.
+fake = ["client", "dep:rcgen", "dep:tokio", "dep:tokio-stream"]
+
+[dependencies]
+prost = "0.14"
+rcgen = { version = "0.14", optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "sync"], optional = true }
+tokio-stream = { version = "0.1", features = ["net"], optional = true }
+tonic = "0.14"
+tonic-prost = "0.14"
+
+[build-dependencies]
+# protox parses the proto in Rust, so building needs no protoc.
+protox = "0.9"
+tonic-prost-build = "0.14"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
