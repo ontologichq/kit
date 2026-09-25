@@ -51,6 +51,33 @@ service Ontologic {
   rpc Revoke(Access) returns (User);
   // Who can use a tenant: every admin, then the members granted to it.
   rpc TenantUsers(TenantName) returns (UserList);
+
+  // Documents out of the tenant's current state and back. A retracted document leaves every
+  // answer, count and link, and the engine keeps what it said, so it can be restored. An erased
+  // document is destroyed: its text, what was read from it and every trace only it left; what
+  // stays is a tombstone with the hash of each version. Erase is for admins.
+  rpc Retract(DocumentsRequest) returns (LifecycleReply);
+  rpc Restore(DocumentsRequest) returns (LifecycleReply);
+  rpc Erase(DocumentsRequest) returns (LifecycleReply);
+
+  // Admins: a migration of the tenant's graph, staged (`commit` false: the diff, nothing
+  // written) or committed, and a rollback is another migration. Only `REPROJECTION` (the same
+  // readings under other rules, no model call) is implemented; the other kinds are refused.
+  rpc Migrate(MigrateRequest) returns (MigrateReply);
+
+  // Admins: who may read a document. A caller who cannot read every document of a tenant is
+  // answered from what they can read alone, and counted over it.
+  rpc SetAcl(AclRequest) returns (Empty);
+  // Admins: the groups a member reads a tenant's documents as.
+  rpc SetPrincipals(PrincipalsRequest) returns (User);
+  // Admins: a reader reads and asks and changes nothing; `reader` false makes them a member.
+  rpc SetReader(ReaderRequest) returns (User);
+
+  // Admins: two entities stated to be one.
+  rpc Merge(MergeRequest) returns (MergeReply);
+  // Admins: how many documents a connector says an origin holds, before it imports; a count
+  // over that origin is exact only when what it counted is all there is.
+  rpc DeclareSync(SyncRequest) returns (Empty);
 }
 
 message Empty {}
@@ -213,6 +240,9 @@ message Relation {
   string object_kind = 11;
   // The words of the source the fact holds under ("fully diluted"); empty when it always holds.
   string condition = 12;
+  // What the fact may be used for: "proposed", "supported" (cited, routed), "accepted" (typed
+  // state), "computable" (counted) or "identity-trusted"; empty from an engine that does not say.
+  string rung = 13;
 }
 
 // One place a source states a fact: the source, which bytes of it, those words, how sure.
@@ -251,6 +281,9 @@ message Mention {
 message ImportRequest {
   string tenant = 1;
   string text = 2;
+  // The caller's own name for the document, unique in the tenant. The same key with the same
+  // bytes is the document it is (nothing is read again); with other bytes, its next version.
+  string key = 3;
 }
 
 message BlobRequest {
@@ -258,6 +291,8 @@ message BlobRequest {
   // The file name; `.eml` is read as an email, anything else as UTF-8 text.
   string name = 2;
   bytes content = 3;
+  // As `ImportRequest.key`.
+  string key = 4;
 }
 
 message ImportEvent {
@@ -429,6 +464,18 @@ message AskAnswer {
   // True when the question has one answer and the options exclude each other; false for a set
   // whose answers can all be right, each with its own probability.
   bool exclusive = 5;
+  // Set when the answer is a number the engine computed: its floor and ceiling.
+  CountRange count = 6;
+}
+
+// A computed number: what it counts ("count", "distinct <field>", "top <field>"), its floor,
+// its ceiling (unset when nothing bounds it), and how far it can be claimed: "exact", "over the
+// records held", "judged" or "bounded".
+message CountRange {
+  string operation = 1;
+  uint64 lower = 2;
+  optional uint64 upper = 3;
+  string status = 4;
 }
 
 message ShowRequest {
@@ -518,10 +565,125 @@ message UserName {
 
 message User {
   string name = 1;
-  // "admin" or "member".
+  // "admin", "member" or "reader".
   string role = 2;
   // The tenants a member was granted; empty for admins, who use every tenant.
   repeated string tenants = 3;
+  // The groups a member reads each tenant's documents as.
+  repeated TenantGroups principals = 4;
+}
+
+message TenantGroups {
+  string tenant = 1;
+  repeated string groups = 2;
+}
+
+message DocumentsRequest {
+  string tenant = 1;
+  // Document ids (`d3`).
+  repeated string documents = 2;
+  string reason = 3;
+}
+
+message Counts {
+  uint32 entities = 1;
+  uint32 relations = 2;
+  uint32 sources = 3;
+}
+
+message LifecycleReply {
+  repeated string documents = 1;
+  Counts before = 2;
+  Counts after = 3;
+}
+
+enum MigrationKind {
+  // The same readings under other rules; no model call.
+  REPROJECTION = 0;
+  // Identity decided again from the same candidates. Not implemented yet.
+  RE_RESOLUTION = 1;
+  // The documents read again under another schema or prompt; model calls. Not implemented yet.
+  RE_EXTRACTION = 2;
+}
+
+message SchemaPin {
+  string kind = 1;
+  uint32 version = 2;
+}
+
+message MigrateRequest {
+  string tenant = 1;
+  MigrationKind kind = 2;
+  repeated SchemaPin pins = 3;
+  string reason = 4;
+  bool commit = 5;
+}
+
+message TypeChange {
+  string relation_type = 1;
+  uint32 added = 2;
+  uint32 removed = 3;
+  uint32 promoted = 4;
+  uint32 demoted = 5;
+}
+
+// What a migration changes, facts matched by what makes them that fact.
+message MigrationDiff {
+  uint32 facts_added = 1;
+  uint32 facts_removed = 2;
+  uint32 promoted = 3;
+  uint32 demoted = 4;
+  uint32 support_changed = 5;
+  uint32 facts_unchanged = 6;
+  uint32 entities_added = 7;
+  uint32 entities_removed = 8;
+  uint32 entities_renamed = 9;
+  uint32 identity_changed = 10;
+  uint32 model_calls = 11;
+  repeated TypeChange by_type = 12;
+}
+
+message MigrateReply {
+  bool committed = 1;
+  MigrationDiff diff = 2;
+}
+
+message AclRequest {
+  string tenant = 1;
+  string document = 2;
+  // `user:<name>` or a group; any one of them reads the document.
+  repeated string principals = 3;
+}
+
+message PrincipalsRequest {
+  string user = 1;
+  string tenant = 2;
+  repeated string groups = 3;
+}
+
+message ReaderRequest {
+  string user = 1;
+  bool reader = 2;
+}
+
+message MergeRequest {
+  string tenant = 1;
+  string from = 2;
+  string into = 3;
+  string why = 4;
+}
+
+message MergeReply {
+  string into = 1;
+  string from = 2;
+  // The names the survivor gained.
+  repeated string aliases = 3;
+}
+
+message SyncRequest {
+  string tenant = 1;
+  string origin = 2;
+  optional uint64 expected = 3;
 }
 
 message NewUser {

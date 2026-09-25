@@ -90,6 +90,7 @@ async fn a_stream_sends_its_events_then_its_error_and_requests_are_kept() {
         .import(pb::ImportRequest {
             tenant: "acme".into(),
             text: "Maya lives in Toronto".into(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -118,4 +119,40 @@ async fn a_call_with_no_script_is_unimplemented_and_an_engine_that_is_gone_is_de
         "{}",
         describe(&status, &host)
     );
+}
+
+#[tokio::test]
+async fn the_lifecycle_and_access_calls_carry_what_they_are_given() {
+    let engine = FakeEngine::start();
+    engine.sign_in("admin", "secret");
+    engine.reply(
+        Rpc::Migrate,
+        pb::MigrateReply {
+            committed: false,
+            diff: Some(pb::MigrationDiff {
+                promoted: 3,
+                model_calls: 0,
+                ..Default::default()
+            }),
+        },
+    );
+    let ca = trusted(&engine, "lifecycle");
+    let (mut client, _) = connect(engine.host(), Some(&ca), "admin", "secret").unwrap();
+    let reply = client
+        .migrate(pb::MigrateRequest {
+            tenant: "acme".into(),
+            kind: pb::MigrationKind::Reprojection as i32,
+            pins: vec![pb::SchemaPin {
+                kind: "ticket".into(),
+                version: 10,
+            }],
+            reason: "rules".into(),
+            commit: false,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(reply.diff.unwrap().promoted, 3);
+    let asked: pb::MigrateRequest = engine.calls()[0].request();
+    assert_eq!(asked.pins[0].version, 10);
 }

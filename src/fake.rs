@@ -47,6 +47,15 @@ pub enum Rpc {
     Grant,
     Revoke,
     TenantUsers,
+    Retract,
+    Restore,
+    Erase,
+    Migrate,
+    SetAcl,
+    SetPrincipals,
+    SetReader,
+    Merge,
+    DeclareSync,
 }
 
 /// One call the fake got: which, who signed in, and the request message's bytes.
@@ -367,5 +376,56 @@ impl Ontologic for Service {
         r: Request<pb::TenantName>,
     ) -> Result<Response<pb::UserList>, Status> {
         self.one(Rpc::TenantUsers, r)
+    }
+    async fn retract(
+        &self,
+        r: Request<pb::DocumentsRequest>,
+    ) -> Result<Response<pb::LifecycleReply>, Status> {
+        self.one(Rpc::Retract, r)
+    }
+    async fn restore(
+        &self,
+        r: Request<pb::DocumentsRequest>,
+    ) -> Result<Response<pb::LifecycleReply>, Status> {
+        self.one(Rpc::Restore, r)
+    }
+    async fn erase(
+        &self,
+        r: Request<pb::DocumentsRequest>,
+    ) -> Result<Response<pb::LifecycleReply>, Status> {
+        self.one(Rpc::Erase, r)
+    }
+    async fn migrate(
+        &self,
+        r: Request<pb::MigrateRequest>,
+    ) -> Result<Response<pb::MigrateReply>, Status> {
+        self.one(Rpc::Migrate, r)
+    }
+    async fn set_acl(&self, r: Request<pb::AclRequest>) -> Result<Response<pb::Empty>, Status> {
+        self.one(Rpc::SetAcl, r)
+    }
+    async fn set_principals(
+        &self,
+        r: Request<pb::PrincipalsRequest>,
+    ) -> Result<Response<pb::User>, Status> {
+        self.one(Rpc::SetPrincipals, r)
+    }
+    async fn set_reader(
+        &self,
+        r: Request<pb::ReaderRequest>,
+    ) -> Result<Response<pb::User>, Status> {
+        self.one(Rpc::SetReader, r)
+    }
+    async fn merge(
+        &self,
+        r: Request<pb::MergeRequest>,
+    ) -> Result<Response<pb::MergeReply>, Status> {
+        self.one(Rpc::Merge, r)
+    }
+    async fn declare_sync(
+        &self,
+        r: Request<pb::SyncRequest>,
+    ) -> Result<Response<pb::Empty>, Status> {
+        self.one(Rpc::DeclareSync, r)
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "ontologic-kit"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "The ontologic engine's API: its gRPC messages, a signed-in client, and a fake engine for testing clients."
