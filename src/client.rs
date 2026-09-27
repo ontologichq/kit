@@ -83,6 +83,9 @@ pub fn endpoint_url(host: &str) -> (String, String, bool) {
     (format!("{scheme}://{authority}"), name, tls)
 }
 
+/// The most bytes of a reply a client reads: what the engine sends at most.
+pub const MAX_REPLY: usize = 1 << 30;
+
 /// A client for `host` that signs in as `user` with `key`, trusting `ca` (or a certificate in
 /// [`TRUST_DIR`], or the web's roots). Returns the client and the host as `name:port`.
 pub fn connect(
@@ -122,7 +125,11 @@ pub fn connect(
         .trim_start_matches("https://")
         .trim_start_matches("http://")
         .to_string();
-    let client = OntologicClient::with_interceptor(endpoint.connect_lazy(), sign_in);
+    // An export is a whole tenant's Turtle, which a thousand documents make tens of megabytes: the
+    // engine sends replies up to 1 GiB, and a client reading 4 MiB, tonic's default, could not
+    // export a tenant of a few hundred documents.
+    let client = OntologicClient::with_interceptor(endpoint.connect_lazy(), sign_in)
+        .max_decoding_message_size(MAX_REPLY);
     Ok((client, host))
 }
 

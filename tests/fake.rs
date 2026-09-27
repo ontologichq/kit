@@ -156,3 +156,31 @@ async fn the_lifecycle_and_access_calls_carry_what_they_are_given() {
     let asked: pb::MigrateRequest = engine.calls()[0].request();
     assert_eq!(asked.pins[0].version, 10);
 }
+
+/// An export is a whole tenant's Turtle: a client reads one of several megabytes, where tonic's
+/// default of 4 MiB refused a tenant of a few hundred documents.
+#[tokio::test]
+async fn a_client_reads_an_export_larger_than_four_megabytes() {
+    let engine = FakeEngine::start();
+    engine.sign_in("admin", "secret");
+    let content = "brain:x brain:y brain:z .\n".repeat(250_000);
+    assert!(content.len() > 6 << 20);
+    engine.reply(
+        Rpc::ExportTurtle,
+        pb::TurtleFile {
+            tenant: "acme".into(),
+            content: content.clone(),
+            summary: None,
+        },
+    );
+    let ca = trusted(&engine, "large");
+    let (mut client, _) = connect(engine.host(), Some(&ca), "admin", "secret").unwrap();
+    let file = client
+        .export_turtle(pb::TenantName {
+            name: "acme".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(file.content.len(), content.len());
+}
