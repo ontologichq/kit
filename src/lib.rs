@@ -27,3 +27,39 @@ pub const KEY_HEADER: &str = "key";
 
 /// What the engine answers when `user` and `key` do not belong to one user.
 pub const SIGN_IN_FAILED: &str = "sign in failed: wrong user or key";
+
+#[cfg(test)]
+mod set_page_tests {
+    use super::pb;
+    use prost::Message;
+    #[test]
+    fn legacy_requests_do_not_opt_into_members_and_new_pages_round_trip() {
+        // An old request encoded with only fields 1 and 2 has no new-field requirement.
+        let request = pb::AskRequest::decode(&b"\x0a\x01t\x12\x01q"[..]).unwrap();
+        assert!(!request.include_set_members);
+        let page = pb::AskEvent {
+            event: Some(pb::ask_event::Event::SetPage(pb::SetPage {
+                result_id: "result1".into(),
+                snapshot_id: "snapshot1".into(),
+                last: true,
+                member_count: 1,
+                members: vec![pb::SetMember {
+                    id: "record1".into(),
+                    label: "Example".into(),
+                    support: Vec::new(),
+                }],
+                count: Some(pb::CountRange {
+                    operation: "count".into(),
+                    lower: 1,
+                    upper: Some(1),
+                    status: "exact".into(),
+                }),
+                ..Default::default()
+            })),
+        };
+        assert_eq!(
+            pb::AskEvent::decode(page.encode_to_vec().as_slice()).unwrap(),
+            page
+        );
+    }
+}

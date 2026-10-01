@@ -420,6 +420,8 @@ message AskRequest {
   bool graph_only = 3;
   // Answer from the staged copy, imports not committed yet included.
   bool staged = 4;
+  // Opt in to complete structured members of computed record sets, streamed in bounded pages.
+  bool include_set_members = 5;
 }
 
 message AskEvent {
@@ -427,7 +429,37 @@ message AskEvent {
     AskIndex index = 1;
     AskAnswer answer = 2;
     Finished finished = 3;
+    SetPage set_page = 4;
   }
+}
+
+// Pages belong to one immutable authorized result. A final empty page is valid for an empty set.
+// Members are ordered by id, each exactly once. A disconnected stream is incomplete.
+message SetPage {
+  string result_id = 1;
+  string snapshot_id = 2;
+  uint64 offset = 3;
+  repeated SetMember members = 4;
+  CountRange count = 5;
+  bool last = 6;
+  uint64 member_count = 7;
+  // Nonempty means enumeration failed; last=false and no complete result may be claimed.
+  string error = 8;
+}
+
+message SetMember {
+  string id = 1;
+  string label = 2;
+  repeated SetSupport support = 3;
+}
+
+message SetSupport {
+  string fact_id = 1;
+  string source_id = 2;
+  uint64 start = 3;
+  uint64 end = 4;
+  float confidence = 5;
+  string trust = 6;
 }
 
 // What the question names, and how much evidence was gathered, before the LLM is asked.
