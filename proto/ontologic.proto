@@ -27,8 +27,16 @@ service Ontologic {
   rpc Import(ImportRequest) returns (stream ImportEvent);
   // The same for a file: an email (.eml) or text, linked part by part.
   rpc ImportBlob(BlobRequest) returns (stream ImportEvent);
-  // Answer from what the tenant knows, with options and probabilities. Stores nothing.
+  // Answer from what the tenant knows, with options and probabilities. Stores nothing, unless the
+  // tenant keeps a question log (`SetAskLog`): then the question, the answer and the ids of the
+  // sources it was shown and cited are kept for the tenant's days, and `Finished` carries the
+  // id they are kept under.
   rpc Ask(AskRequest) returns (stream AskEvent);
+  // Whether a logged answer was right, by the user who asked it: the id `Finished` carried.
+  // An unknown id and another user's get the same NOT_FOUND.
+  rpc Feedback(FeedbackRequest) returns (Empty);
+  // Admins: how many days a tenant keeps its question log; 0 stops it and deletes what it kept.
+  rpc SetAskLog(AskLogRequest) returns (Empty);
 
   // Imports wait in a staged copy of the tenant until they are committed: questions do not see
   // them until then. The reply's `staged` is what was committed, or what was dropped.
@@ -411,6 +419,9 @@ message Finished {
   // Sources still waiting for a relation pass.
   uint32 waiting = 2;
   Timing timing = 3;
+  // An ask: the id its question and answer are kept under, set only once they are written;
+  // empty when the tenant keeps no question log.
+  string ask_id = 4;
 }
 
 message AskRequest {
@@ -498,6 +509,26 @@ message AskAnswer {
   bool exclusive = 5;
   // Set when the answer is a number the engine computed: its floor and ceiling.
   CountRange count = 6;
+  // "answered"; "unsure" (shown, but a check would have withheld it: `status_reason` says why);
+  // "withheld" (the options were dropped: `status_reason` says why); or "computed" (written by
+  // code from the records). Empty from an engine before 0.3.0.
+  string status = 7;
+  string status_reason = 8;
+}
+
+message FeedbackRequest {
+  string tenant = 1;
+  string ask_id = 2;
+  // "right", "partly" or "wrong".
+  string verdict = 3;
+  // At most 1 KiB.
+  string note = 4;
+}
+
+message AskLogRequest {
+  string tenant = 1;
+  // At most 365; 0 stops the log and deletes what it kept.
+  uint32 keep_days = 2;
 }
 
 // A computed number: what it counts ("count", "distinct <field>", "top <field>"), its floor,

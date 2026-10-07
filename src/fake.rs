@@ -37,6 +37,8 @@ pub enum Rpc {
     Import,
     ImportBlob,
     Ask,
+    Feedback,
+    SetAskLog,
     Commit,
     Rollback,
     Show,
@@ -331,6 +333,18 @@ impl Ontologic for Service {
     }
     async fn ask(&self, r: Request<pb::AskRequest>) -> Result<Response<Self::AskStream>, Status> {
         self.many(Rpc::Ask, r)
+    }
+    async fn feedback(
+        &self,
+        r: Request<pb::FeedbackRequest>,
+    ) -> Result<Response<pb::Empty>, Status> {
+        self.one(Rpc::Feedback, r)
+    }
+    async fn set_ask_log(
+        &self,
+        r: Request<pb::AskLogRequest>,
+    ) -> Result<Response<pb::Empty>, Status> {
+        self.one(Rpc::SetAskLog, r)
     }
     async fn commit(
         &self,

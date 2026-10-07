@@ -157,6 +157,75 @@ async fn the_lifecycle_and_access_calls_carry_what_they_are_given() {
     assert_eq!(asked.pins[0].version, 10);
 }
 
+/// An ask's `Finished` carries the id its question is kept under, and feedback and the log's days
+/// go back with what they are given.
+#[tokio::test]
+async fn a_logged_answer_carries_its_id_and_feedback_names_it() {
+    let engine = FakeEngine::start();
+    engine.sign_in("maya", "secret");
+    engine.stream(
+        Rpc::Ask,
+        vec![
+            Ok(pb::AskEvent {
+                event: Some(pb::ask_event::Event::Answer(pb::AskAnswer {
+                    status: "unsure".into(),
+                    status_reason: "the answer cites another subject".into(),
+                    ..Default::default()
+                })),
+            }),
+            Ok(pb::AskEvent {
+                event: Some(pb::ask_event::Event::Finished(pb::Finished {
+                    ask_id: "a1b2".into(),
+                    ..Default::default()
+                })),
+            }),
+        ],
+    );
+    engine.reply(Rpc::Feedback, pb::Empty {});
+    engine.reply(Rpc::SetAskLog, pb::Empty {});
+    let ca = trusted(&engine, "asklog");
+    let (mut client, _) = connect(engine.host(), Some(&ca), "maya", "secret").unwrap();
+    let mut events = client
+        .ask(pb::AskRequest {
+            tenant: "acme".into(),
+            question: "who approved the pilot".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let answer = events.message().await.unwrap().unwrap();
+    assert!(matches!(answer.event, Some(pb::ask_event::Event::Answer(a)) if a.status == "unsure"));
+    let finished = events.message().await.unwrap().unwrap();
+    let Some(pb::ask_event::Event::Finished(f)) = finished.event else {
+        panic!("no Finished")
+    };
+    client
+        .feedback(pb::FeedbackRequest {
+            tenant: "acme".into(),
+            ask_id: f.ask_id,
+            verdict: "wrong".into(),
+            note: "it named the proposal, not the approval".into(),
+        })
+        .await
+        .unwrap();
+    client
+        .set_ask_log(pb::AskLogRequest {
+            tenant: "acme".into(),
+            keep_days: 90,
+        })
+        .await
+        .unwrap();
+    let calls = engine.calls();
+    let feedback: pb::FeedbackRequest = calls[1].request();
+    assert_eq!(
+        (feedback.ask_id.as_str(), feedback.verdict.as_str()),
+        ("a1b2", "wrong")
+    );
+    let days: pb::AskLogRequest = calls[2].request();
+    assert_eq!(days.keep_days, 90);
+}
+
 /// An export is a whole tenant's Turtle: a client reads one of several megabytes, where tonic's
 /// default of 4 MiB refused a tenant of a few hundred documents.
 #[tokio::test]
