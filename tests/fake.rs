@@ -110,8 +110,9 @@ async fn a_call_with_no_script_is_unimplemented_and_an_engine_that_is_gone_is_de
     let (mut client, _) = connect(engine.host(), Some(&ca), "admin", "secret").unwrap();
     let status = client.list_tenants(pb::Empty {}).await.unwrap_err();
     assert_eq!(status.code(), Code::Unimplemented);
-    // An engine that does not serve the question log answers its calls the same way, which a
-    // client can tell from a refusal.
+    // The new calls, unscripted, answer UNIMPLEMENTED as every other call does here. This is the
+    // code an engine built before 0.3.0 answers them with (tonic has no route for them), so a
+    // client can tell "no question log" from a refusal; the fake still serves the route itself.
     let status = client
         .feedback(pb::FeedbackRequest::default())
         .await
