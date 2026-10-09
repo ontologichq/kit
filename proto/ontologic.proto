@@ -102,6 +102,10 @@ message HealthReply {
   string version = 4;
   // The embedding model: "bge-small-en-v1.5", or "none (why)".
   string embedder = 5;
+  // What is wrong now, a line each: a model provider refusing the engine's account or running out
+  // of credit ("embedder: credit spent: ..."), and what the indexes of the tenants the caller may
+  // use are missing ("<tenant>: ..."). Empty when nothing is. An older engine sends none.
+  repeated string degraded = 6;
 }
 
 message TenantName {

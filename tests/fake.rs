@@ -55,6 +55,31 @@ async fn a_client_signs_in_and_gets_the_scripted_replies_in_order() {
     );
 }
 
+/// 0.4.0: Health says what is degraded, a line each, and an engine that sends none reads as empty.
+#[tokio::test]
+async fn health_says_what_is_degraded() {
+    let engine = FakeEngine::start();
+    engine.sign_in("admin", "secret");
+    engine.reply(
+        Rpc::Health,
+        pb::HealthReply {
+            degraded: vec![
+                "embedder: credit spent".into(),
+                "acme: 3 of 9 passages not embedded".into(),
+            ],
+            ..Default::default()
+        },
+    );
+    engine.reply(Rpc::Health, pb::HealthReply::default());
+    let ca = trusted(&engine, "degraded");
+    let (mut client, _) = connect(engine.host(), Some(&ca), "admin", "secret").unwrap();
+    let first = client.health(pb::Empty {}).await.unwrap().into_inner();
+    assert_eq!(first.degraded.len(), 2);
+    assert!(first.degraded[0].starts_with("embedder: "));
+    let then = client.health(pb::Empty {}).await.unwrap().into_inner();
+    assert!(then.degraded.is_empty());
+}
+
 #[tokio::test]
 async fn a_wrong_key_is_refused_with_the_engines_message() {
     let engine = FakeEngine::start();
